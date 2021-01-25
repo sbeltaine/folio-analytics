@@ -99,8 +99,12 @@ WITH parameters AS (
         '2021-01-01' :: DATE AS end_date,
         '' :: VARCHAR AS workflow_status,
         '' :: VARCHAR AS order_type,
-        '2000-01-01' :: DATE AS subscription_from_date,
-        '2021-01-01' :: DATE AS subscription_to_date
+        
+        -- Please comment/uncomment one pair the these parameters if you want to define the range of active subscriptions  
+       	NULL :: DATE AS subscription_from_date,
+        NULL :: DATE AS subscription_to_date
+        --'2000-01-01' :: DATE AS subscription_from_date,
+   	--'2021-01-01' :: DATE AS subscription_to_date
 ),
 
 --subquery for po_lines_detail
@@ -205,17 +209,20 @@ ON poinvli.po_line_id =
 --filter po by order type and date
 WHERE
 	--3 options for filtering on tags
-	AND podtl.po_date_ordered > (SELECT start_date FROM parameters) AND 
-		podtl.po_date_ordered < (SELECT end_date FROM parameters))
-	AND
-	(podtl.po_workflow_status = (SELECT workflow_status FROM parameters)) OR 
-		((SELECT workflow_status FROM parameters) = '')
+--	 (podtl.po_date_ordered > (SELECT start_date FROM parameters) AND 
+--		podtl.po_date_ordered < (SELECT end_date FROM parameters))
+--	AND
+	((podtl.po_workflow_status = (SELECT workflow_status FROM parameters)) OR 
+		((SELECT workflow_status FROM parameters) = ''))
 	AND 
-	(po_order_type = (SELECT order_type FROM parameters)) OR 
-		((SELECT order_type FROM parameters) = '')
-	--AND 
-	--pol.pol_subscription_to >= (SELECT subscription_from_date FROM parameters) AND 
-		--pol.pol_subscription_from <= (SELECT subscription_to_date FROM parameters))
+	((po_order_type = (SELECT order_type FROM parameters)) OR 
+		((SELECT order_type FROM parameters) = ''))
+	AND 
+	((pol.pol_subscription_to >= (SELECT subscription_from_date FROM parameters) OR 
+		pol.pol_subscription_from <= (SELECT subscription_to_date FROM parameters))			
+		OR 
+		(((SELECT subscription_to_date FROM parameters) IS NULL) 
+			OR ((SELECT subscription_from_date FROM parameters) IS NULL)))
 		
 --GROUP BY
 	--pol_po_line_number,
