@@ -1,14 +1,18 @@
 /**
  
+ Next Steps
+ -Axel to see how to do subscription dates in the filter section in MAIN QUERY
+ -Sharon to look at 3 options for filtering on tags in Title Count query to add to MAIN QUERY
  
  Meeting topics...
- -derived tables: subscription to and from, tags
- -more fields: workflow-status and renewal date (where is this?)
- -filters: date, order type, subscription
+ -renewal date 
+ -date_ordered for date field from po_purchase_orders	
+ -bringing in all the renewal information from po_ongoing
+ -filters: date, order type, tags, workflow status, subscription
  
 
 PURPOSE
-The purpose of this report is to provide details about each purchase order with filtering by date and/or order type.
+The purpose of this report is to provide details about each purchase order with filtering by date, order type, tags, and/or workflow status.
 
 MAIN TABLES AND COLUMNS INCLUDED
 
@@ -34,7 +38,7 @@ MAIN TABLES AND COLUMNS INCLUDED
 -invoice_lines
 	-invoice_id
 	-invoice_line_number
-	-po_line_id (JOIN on this)
+	-po_line_id
 	
 	
 AGGREGATION
@@ -42,12 +46,17 @@ AGGREGATION
 
 	
 FILTERS FOR USERS TO SELECT
-date filter on approval_date
-order type
+order type: can be set to One-Time or Ongoing; "subscription to," subscription from" and "subscription interval" data only shows for One-Time order type
 workflow status: can be set to pending, open, or closed
 tags: local field with custom settings	
+date filter on data_ordered on po_purchase_orders
 
-HARDCODED FILTERS		
+HARDCODED FILTERS
+
+
+OPTIONAL FIELDS
+acquistion unit id and acquisition unit name will only show data if the institution has elected to use these fields
+		
 
 
 STILL IN PROGRESS
@@ -60,7 +69,7 @@ NOTE
 -consider creating one derived table for both electronic and physical material type (later); Nancy creating
 
 ADD
--renewal date and workflow status from PO purchase order table; renewal date is only there if order type is ongoing
+-renewal date is only there if order type is ongoing
 -need another derived table to show ongoing status with renewal dates from po_purchase_orders
 -filter on workflow status (e.g., pending, open, closed)
 -updated date and created date (data array from po_purchase_order)	
@@ -71,11 +80,16 @@ include as filter, user will need to enter tag being sought
 DOCUMENT
 -add information on using created and updated date from po_purchase_orders data array, 
 but use approval_date as the main date data element
--acquisition unit is optional for institutions to implement
+-acquisition unit id and name are optional for institutions to implement
 -need to think about prefixes and suffixes for po line number (optional)
 -some POs have both electronic and physical material type on the same PO; these are divided by PO line
 -subscription to and from are changeable filters, not part of the results set
+-subscription data entry is optional for institutions
 
+-what subscriptions have I paid for this year?
+-what subscriptions have I not paid for this year?
+-need ongoing orders with outstanding payments with subsets for subscription and not subscriptions (another query)
+-will grab paymentDate field from invoices data array when available
 					
 */
 --updated to use date
@@ -92,52 +106,63 @@ WITH parameters AS (
 --subquery for po_lines_detail
  po_lines_detail AS (
 SELECT
-	pol.id AS "po_lines_id",
+	pol.id AS "po_line_id",
 	pol.po_line_number AS "pol_po_line_number",
-	--need derived table for tags
-	--pol.tags AS "purchase_order_tags",	
+	poltags.po_tags AS "purchase_order_tags",	
 	pol.description AS "pol_purchase_order_description",
 	pol.acquisition_method AS "pol_purchase_order_acquisition_method",
-	--need po_lines_subscription_range derived table
-	--pol.subscription_from AS "pol_subscription_from",
-	--pol.subscription_to AS "pol_subscription_to",
-	--pol.subscription_interval as "pol_subscription_interval",
+	polsubdtl.subscription_from AS "pol_subscription_from",
+	polsubdtl.subscription_to AS "pol_subscription_to",
+	polsubdtl.subscription_interval as "pol_subscription_interval",
 	polermat.pol_er_mat_type_name AS "purchase_order_elec_material_type_name",
 	polphysmat.pol_mat_type_name AS "purchase_order_phys_material_type_name",
-	--pol.instance_id AS "purchase_order_instance_id", --need to see if instance id is available
-	pol.agreement_id AS "purchase_order_agreement_id",
-	pol.purchase_order_id
+	pol.instance_id AS "instance_id",
+	pol.agreement_id AS "agreement_id",
+	pol.purchase_order_id AS "purchase_order_id"
 	
 FROM po_lines AS pol
 LEFT JOIN folio_reporting.po_lines_er_mat_type AS polermat
 ON pol.id = polermat.pol_id
 LEFT JOIN folio_reporting.po_lines_phys_mat_type AS polphysmat
 ON pol.id = polphysmat.pol_id
---LEFT JOIN folio_reporting.po_lines_tags AS poltags
---ON pol.id = poltags.pol_id
---LEFT JOIN folio_reporting.po_lines_details_subscriptions AS polsubdtl
---ON pol.id = polsubdtl.pol.id
+LEFT JOIN folio_reporting.po_lines_tags AS poltags
+ON pol.id = poltags.pol_id
+LEFT JOIN folio_reporting.po_lines_details_subscription AS polsubdtl
+ON pol.id = polsubdtl.pol.id
 
 ),
 
 --subquery for po_purchase_order_detail
 po_purchase_order_detail AS (
 SELECT
-	podtl.id AS "purchaseorder_detail_id",
+	podtl.id AS "po_detail_id",
 	podtl.order_type AS "po_order_type",
 	podtl.po_number AS "po_number",
+	podtl.date_ordered AS "po_date_ordered"
 	podtl.workflow_status AS "po_workflow_status",
 	poacqunitids.po_acquisition_unit_id AS "po_acquisition_unit_id",
-	poacqunitids.po_acquisition_unit_name AS "po_acquisition_unit_name"
-	--renewal date
+	poacqunitids.po_acquisition_unit_name AS "po_acquisition_unit_name",
+	poonging.po_ongoing_interval AS "po_ongoing_interval",
+	poonging.po_ongoing_is_subscription AS "po_is_subscription",
+	poonging.po_ongoing_renewal_date AS "po_renewal date",
+	poonging.po_ongoing_review_period AS "po_review_period"
 	
 FROM po_purchase_orders AS podtl
-
 LEFT JOIN folio_reporting.po_acq_unit_ids AS poacqunitids
 ON podtl.id = poacqunitids.po_id
+LEFT JOIN folio_reporting.po_ongoing AS poonging
+ON podtl.id = poonging.po_id
 
---Add new subquery here
---use po_line_id in invoice_lines to join to po_lines, get po_line_number from po_lines
+
+--subquery for invoice line data	
+po_invoice_lines AS (
+SELECT 
+	poinvli.invoice_id AS "invoice_id",
+	poinvli.invoice_line_number AS "invoice_line_number"
+	poinvli.invoice_line_status AS "invoice_line_status"
+	poinvli.po_line_id AS "po_line_id"
+
+FROM invoice_lines AS poinvli
 
 )
 
@@ -160,10 +185,11 @@ SELECT
 	--subscription from AS "pol_subscription_from"?
 	purchase_order_elec_material_type_name,
 	purchase_order_phys_material_type_name,
-	--purchase_order_instance_id,
-	purchase_order_agreement_id
+	--instance_id,
+	--agreement_id
 	--renewal_date?
 	--workflow-status?
+	--date_ordered?
 
 FROM po_lines_detail AS pol
 	
@@ -172,24 +198,24 @@ FROM po_lines_detail AS pol
 --pull the purchase order related data by joining tables
 LEFT JOIN po_purchase_order_detail AS podtl
 	ON podtl.purchaseorder_detail_id = pol.purchase_order_id
+	
+LEFT JOIN po_invoice_lines AS poinvli
+ON poinvli.po_line_id = 
 
 --filter po by order type and date
 WHERE
-	--order type = One-Time or Ongoing
-	--AND subscription to (SELECT start_date FROM parameters) AND 
-		--subscription from < (SELECT end_date FROM parameters))
-	--AND
+	--3 options for filtering on tags
+	AND podtl.po_date_ordered > (SELECT start_date FROM parameters) AND 
+		podtl.po_date_ordered < (SELECT end_date FROM parameters))
+	AND
 	(podtl.po_workflow_status = (SELECT workflow_status FROM parameters)) OR 
 		((SELECT workflow_status FROM parameters) = '')
 	AND 
 	(po_order_type = (SELECT order_type FROM parameters)) OR 
 		((SELECT order_type FROM parameters) = '')
-	AND 
+	--AND 
 	--pol.pol_subscription_to >= (SELECT subscription_from_date FROM parameters) AND 
-	--	pol.pol_subscription_from <= (SELECT subscription_to_date FROM parameters))
-	AND 
-	pol.pol_subscription_to >= (SELECT subscription_from_date FROM parameters) AND 
-		pol.pol_subscription_from <= (SELECT subscription_to_date FROM parameters))
+		--pol.pol_subscription_from <= (SELECT subscription_to_date FROM parameters))
 		
 --GROUP BY
 	--pol_po_line_number,
@@ -199,8 +225,6 @@ WHERE
 	--purchase_order_phys_material_type_name
 	
 	;
-
-
 
 
 	
