@@ -1,10 +1,5 @@
 /**
  
- Next Steps
-  -wait on adding agreement id? YES
- -reviewers?
- -ask Nassib about date_ordered and instance_id, it is not in current folio_snapshot
-
 PURPOSE
 The purpose of this report is to provide details about each purchase order. 
 It allows filtering by date, order type, tags, and workflow status. 
@@ -13,66 +8,40 @@ The data are aggregated by purchase order, acquisition method, and material type
 MAIN TABLES AND COLUMNS INCLUDED
 
 -po_lines
-	-purchase order line id
+	-purchase order line number
 	-purchase_order_number from po_lines_id
 	-tags (data array)
-	-description
+	-purchase order description
 	-acquisition method
 	-subscription from
 	-subscription to 
-	-subscription interval (json extract text - see "interesting times" data row)
 	-material type (data array)
 	-instanceid
 	
 -po_purchase_orders
-	-order_type
-	-approval_date
-	-workflow-status
-	-acquisition_unit_ids (data array)
-	-subtotal
+	-order type
+	-workflow status
+	-acquisition unit (data array)
+	-acquisition method
 
--invoice_lines
-	-invoice_id
-	-invoice_line_number
-	-po_line_id
-	
+
 AGGREGATION
-This query aggregates the data by 
-	--pol_po_line_number,
-	--po_order_type,
-	--pol_purchase_order_acquisition_method,
-	--purchase_order_elec_material_type_name,
-	--purchase_order_phys_material_type_name
+This query aggregates the data by po line number, po order type, po acquisition method, po acquisition unit name, and material type.	
 	
 FILTERS FOR USERS TO SELECT
 date: filters data using the date_ordered field on purchase orders
-order type: can be set to One-Time or Ongoing; "subscription to," subscription from" and "subscription interval" data only shows for One-Time order type; renewal date is only present if order type is Ongoing
+order type: can be set to One-Time or Ongoing; renewal date is only present if order type is Ongoing
+subscription: can be set for "subscription to," subscription from" dates; subscription data only shows for One-Time order type
 workflow status: can be set to pending, open, or closed
-tags: local field with custom settings	
-
-HARDCODED FILTERS
-
+tags: local field with custom settings; can set up to 3 tag filters	
 
 OPTIONAL FIELDS
-acquistion unit id and acquisition unit name: these fields will only show data if the institution has elected to use them
-		
-DOCUMENT
--acquisition unit id and name are optional for institutions to implement
--some POs have both electronic and physical material type on the same PO; these are divided by PO line
--subscription to and from are changeable filters, not part of the results set
--subscription data entry is optional for institutions
+Acquistion unit id and acquisition unit name: these fields will only show data if the institution has elected to use them.
+Subscription data entry is optional for institutions.
+
 
 STILL IN PROGRESS
--need to add paymentDate field from invoices data array when available
--consider creating one derived table for both electronic and physical material type (later); Nancy creating
--need to think about prefixes and suffixes for po line number (optional)
--add agreement_id; agreements order line to entitlement to agreement; resource type is on the entitlements table
-
-SEPARATE QUERIES
--what subscriptions have I paid for this year?
--what subscriptions have I not paid for this year?
--need ongoing orders with outstanding payments with subsets for subscription and not subscriptions (another query)
-
+-need to add paymentDate field from invoices data array when this field is available
 					
 */
 --updated to use date
@@ -145,15 +114,6 @@ ON podtl.id = poonging.po_id
 
 )
 
---subquery for invoice line data	
---po_invoice_lines AS (
---SELECT 
-	--poinvli.invoice_id AS "invoice_id",
-	--poinvli.invoice_line_number AS "invoice_line_number",
-	--poinvli.invoice_line_status AS "invoice_line_status",
-	--poinvli.po_line_id AS "po_line_id"
-
---FROM invoice_lines AS poinvli
 
 
 /*
@@ -168,34 +128,14 @@ SELECT
 	po_line_number,
 	purchase_order_description,
 	po_order_type,
-	--purchase_order_tags? NO
-	--podtl.po_number AS "po_number",NO
 	purchase_order_acquisition_method,
 	po_acquisition_unit_name,
-	--subscription_to?NO
-	--subscription_from?NO
-	--subscription_interval?NO
 	purchase_order_elec_material_type_name,
 	purchase_order_phys_material_type_name
-	--instance_id,
-	--agreement_id
-	--renewal_date?
-	--podtl.workflow_status AS "po_workflow_status"? NO
-	--poonging.po_ongoing_interval AS "po_ongoing_interval", NO
-	--poonging.po_ongoing_is_subscription AS "po_is_subscription", NO
-	--poonging.po_ongoing_renewal_date AS "po_renewal date", NO
-	--poonging.po_ongoing_review_period AS "po_review_period" NO
- 	--nothing from invoice_lines
 	
-/*
- 
- 	--
- 
- 
  */	
 	
 	
-
 FROM po_lines_detail AS pol
 	
 LEFT JOIN po_purchase_order_detail AS podtl
@@ -205,7 +145,6 @@ LEFT JOIN po_purchase_order_detail AS podtl
 
 --filter po by order type and date
 WHERE
-	--3 options for filtering on tags
 --	 (podtl.po_date_ordered > (SELECT start_date FROM parameters) AND 
 --		podtl.po_date_ordered < (SELECT end_date FROM parameters))
 --	AND
@@ -231,36 +170,14 @@ WHERE
 			AND (SELECT tags_filter2 FROM parameters) = ''
 			AND (SELECT tags_filter3 FROM parameters) = ''))
 		
---GROUP BY
-	--po_line_number,
-	--order_type,
-	--purchase_order_acquisition_method,
-	--purchase_order_elec_material_type_name,
-	--purchase_order_phys_material_type_name
+GROUP BY
+	po_line_number,
+	po_order_type,
+	purchase_order_description,
+	po_acquisition_unit_name,
+	purchase_order_acquisition_method,
+	purchase_order_elec_material_type_name,
+	purchase_order_phys_material_type_name
 	
 	;
-
-
-
-
-	
-	
-	
-
-				
-		
-	
-	
-
-
-
-	
-	
-	
-
-				
-		
-	
-	
-
 
