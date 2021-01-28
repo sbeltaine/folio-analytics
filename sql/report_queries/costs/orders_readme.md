@@ -2,5 +2,5 @@ Order Cluster query
 
 
 The purpose of this report is to provide details about each purchase order. 
-It allows filtering by date, order type, tags, and workflow status. 
-The data are aggregated by purchase order, acquisition method, and material type.
+It allows filtering by date, subscription range, order type, tags, and workflow status. 
+The data are aggregated by purchase order line number, acquisition method, acquistion unit name, and material type.
